@@ -1,7 +1,16 @@
-id,name,age,salary,city
-1,Amit,25.0,50000.0,Pune
-3,Rahul,30.0,50500.0,Delhi
-4,Amit,25.0,50000.0,Pune
-8,Sneha,27.0,52000.0,
-9,Ravi,26.5,48000.0,Delhi
-10,Ankit,26.0,51000.0,Pune
+id,name,age,salary,city,joining_date,active_status
+1,Amit Sharma,25,50000,Pune,2023-01-15,Yes
+2,Neha,28.0,60k,Mumbai,15/02/2023,No
+3,Rahul Verma,30,51000.0,Delhi,2023/03/20,Yes
+4,Amit Sharma,25,50000,Pune,2023-01-15,Yes
+5,Priya Singh,120,70000,Bangalore,2023-05-10,Yes
+6,Karan,28,1000000,Mumbai,not available,No
+7,,22,45000,Pune,2023-07-11,Yes
+8,Sneha,27,"52,000",,2023-08-19,Yes
+9,Ravi,28.0,48000,Delhi,2023-09-25,No
+10,Ankit,26,51000,Pune,2023-10-30,Yes
+11,John Doe,twenty nine,55000,New York,2023-11-12,Yes
+12,Alice,29,-40000,London,2023-12-01,No
+13,Bob,31,51000.0,Sydney,2024-01-20,Yes
+14,Charlie,35,75000,Toronto,2024-02-14,Maybe
+15,David,28.0,82000,Mumbai,2024-03-05,Yes

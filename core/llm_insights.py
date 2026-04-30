@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any, Dict
 from urllib import error, request
 
@@ -45,8 +46,32 @@ def _extract_message_content(response: Dict[str, Any]) -> str:
         raise ValueError(f"Unexpected response structure: {response}") from exc
 
 
+def _load_env() -> None:
+    env_path = Path(__file__).resolve().parents[1] / ".env"
+    load_dotenv(dotenv_path=env_path, override=False)
+
+
+def _parse_json_content(content: str) -> Dict[str, Any] | None:
+    try:
+        result = json.loads(content)
+        if isinstance(result, dict):
+            return result
+        return None
+    except json.JSONDecodeError:
+        start = content.find("{")
+        end = content.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                result = json.loads(content[start : end + 1])
+                if isinstance(result, dict):
+                    return result
+            except json.JSONDecodeError:
+                return None
+        return None
+
+
 def generate_insights(profile: dict) -> dict:
-    load_dotenv()
+    _load_env()
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY not found in environment or .env")
@@ -72,10 +97,9 @@ def generate_insights(profile: dict) -> dict:
     response = _post_json(GROQ_API_URL, payload, api_key)
     content = _extract_message_content(response)
 
-    try:
-        result = json.loads(content)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Groq returned non-JSON content: {content}") from exc
+    result = _parse_json_content(content)
+    if result is None:
+        raise ValueError(f"Groq returned non-JSON content: {content}")
 
     if not isinstance(result, dict):
         raise ValueError("Groq response JSON is not an object")
@@ -95,7 +119,7 @@ def generate_explanation(suggestion: dict, profile_summary: dict) -> dict:
     }
 
     try:
-        load_dotenv()
+        _load_env()
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             return fallback
@@ -133,8 +157,8 @@ def generate_explanation(suggestion: dict, profile_summary: dict) -> dict:
 
         response = _post_json(GROQ_API_URL, payload, api_key)
         content = _extract_message_content(response)
-        result = json.loads(content)
-        if not isinstance(result, dict):
+        result = _parse_json_content(content)
+        if result is None:
             return fallback
         if "explanation" not in result or "impact" not in result:
             return fallback

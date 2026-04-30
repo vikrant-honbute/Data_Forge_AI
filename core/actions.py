@@ -26,6 +26,21 @@ def fill_missing_median(df: pd.DataFrame, column: str, params: dict | None = Non
 	return updated
 
 
+def fill_value(df: pd.DataFrame, column: str, params: dict | None = None) -> pd.DataFrame:
+	if column not in df.columns:
+		return df
+
+	value = None
+	if params:
+		value = params.get("value")
+	if value is None:
+		return df
+
+	updated = df.copy()
+	updated[column] = updated[column].fillna(value)
+	return updated
+
+
 def drop_column(df: pd.DataFrame, column: str, params: dict | None = None) -> pd.DataFrame:
 	if column not in df.columns:
 		return df
@@ -58,6 +73,7 @@ def remove_outliers_iqr(df: pd.DataFrame, column: str, params: dict | None = Non
 ACTION_MAP: Dict[str, Callable[..., pd.DataFrame]] = {
 	"fill_mean": fill_missing_mean,
 	"fill_median": fill_missing_median,
+	"fill_value": fill_value,
 	"drop_column": drop_column,
 	"remove_duplicates": remove_duplicates,
 	"remove_outliers": remove_outliers_iqr,

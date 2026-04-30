@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import streamlit as st
 import pandas as pd
+import requests
 
-from core.executor import apply_single_suggestion
 from core.llm_insights import generate_explanation
-from core.suggestions import generate_suggestions
 from core.versioning import save_version
 
 st.title("Data Cleaning AI Assistant")
@@ -23,6 +22,24 @@ if "uploaded_name" not in st.session_state:
 if "explanations" not in st.session_state:
     st.session_state.explanations = {}
 
+
+def _apply_suggestion_via_api(df: pd.DataFrame, suggestion: dict) -> pd.DataFrame | None:
+    try:
+        safe_df = df.astype(object).where(pd.notnull(df), None)
+        records = safe_df.to_dict(orient="records")
+        response = requests.post(
+            "http://127.0.0.1:8000/apply-step",
+            json={"data": records, "suggestion": suggestion},
+            timeout=20,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        updated_records = payload.get("updated_data", [])
+        return pd.DataFrame(updated_records)
+    except Exception as exc:
+        st.write(f"Failed to apply suggestion: {exc}")
+        return None
+
 uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 if uploaded_file is not None:
     if st.session_state.uploaded_name != uploaded_file.name:
@@ -39,10 +56,25 @@ if st.button("Generate suggestions"):
     if st.session_state.df is None:
         st.write("Please upload a CSV file first.")
     else:
-        st.session_state.suggestions = generate_suggestions(st.session_state.df)
-        st.session_state.current_step = 0
-        st.session_state.actions_applied = []
-        st.session_state.explanations = {}
+        try:
+            safe_df = st.session_state.df.astype(object).where(
+                pd.notnull(st.session_state.df),
+                None,
+            )
+            records = safe_df.to_dict(orient="records")
+            response = requests.post(
+                "http://127.0.0.1:8000/suggest",
+                json=records,
+                timeout=20,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            st.session_state.suggestions = payload.get("suggestions", [])
+            st.session_state.current_step = 0
+            st.session_state.actions_applied = []
+            st.session_state.explanations = {}
+        except Exception as exc:
+            st.write(f"Failed to fetch suggestions: {exc}")
 
 suggestions = st.session_state.suggestions
 if suggestions:
@@ -80,22 +112,20 @@ if suggestions:
 
         accept_clicked = st.button("Accept")
         reject_clicked = st.button("Reject")
-        modify_clicked = st.button("Modify")
 
         if accept_clicked:
-            st.session_state.df = apply_single_suggestion(st.session_state.df, suggestion)
-            action_name = suggestion.get("action")
-            if column:
-                st.session_state.actions_applied.append(f"{action_name}_{column}")
-            else:
-                st.session_state.actions_applied.append(str(action_name))
-            st.session_state.current_step += 1
+            updated_df = _apply_suggestion_via_api(st.session_state.df, suggestion)
+            if updated_df is not None:
+                st.session_state.df = updated_df
+                action_name = suggestion.get("action")
+                if column:
+                    st.session_state.actions_applied.append(f"{action_name}_{column}")
+                else:
+                    st.session_state.actions_applied.append(str(action_name))
+                st.session_state.current_step += 1
 
         if reject_clicked:
             st.session_state.current_step += 1
-
-        if modify_clicked:
-            st.write("Modify is not implemented yet.")
     else:
         st.write("All suggestions processed.")
 
