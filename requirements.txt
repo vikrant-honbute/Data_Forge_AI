@@ -1,8 +1,4 @@
 pandas
-numpy
-scikit-learn
 pydantic
-langgraph
-groq
 python-dotenv
-requests
+streamlit

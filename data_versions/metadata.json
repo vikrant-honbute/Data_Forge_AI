@@ -1,0 +1,14 @@
+{
+  "v1": {
+    "file": "v1.csv",
+    "actions": [
+      "fill_median_name",
+      "fill_median_age",
+      "remove_outliers_age",
+      "fill_median_salary",
+      "remove_outliers_salary",
+      "fill_median_city"
+    ],
+    "timestamp": "2026-04-30T21:03:03"
+  }
+}

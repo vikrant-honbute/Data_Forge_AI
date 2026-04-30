@@ -28,7 +28,7 @@ def main() -> int:
 
     df = pd.read_csv(csv_path)
     profile = build_profile(df)
-    suggestions = generate_suggestions(profile)
+    suggestions = generate_suggestions(df)
     insights = generate_insights(profile)
     saved_path = save_profile(profile)
 

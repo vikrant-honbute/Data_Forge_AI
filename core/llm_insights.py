@@ -86,3 +86,62 @@ def generate_insights(profile: dict) -> dict:
         "summary": result["summary"],
         "risks": result["risks"],
     }
+
+
+def generate_explanation(suggestion: dict, profile_summary: dict) -> dict:
+    fallback = {
+        "explanation": "LLM explanation unavailable. Review the suggestion details manually.",
+        "impact": "No impact assessment available.",
+    }
+
+    try:
+        load_dotenv()
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            return fallback
+
+        model = os.getenv("GROQ_MODEL", DEFAULT_MODEL)
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        "Return JSON with keys explanation and impact only. "
+                        "No code, no steps, keep it short."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        "Profile summary: "
+                        + json.dumps(profile_summary, ensure_ascii=True)
+                        + "\nColumn: "
+                        + str(suggestion.get("column"))
+                        + "\nIssue: "
+                        + str(suggestion.get("issue"))
+                        + "\nSuggested action: "
+                        + str(suggestion.get("action"))
+                        + "\nExplain why this action is recommended and its impact."
+                    ),
+                },
+            ],
+            "temperature": 0.2,
+            "max_tokens": 200,
+            "response_format": {"type": "json_object"},
+        }
+
+        response = _post_json(GROQ_API_URL, payload, api_key)
+        content = _extract_message_content(response)
+        result = json.loads(content)
+        if not isinstance(result, dict):
+            return fallback
+        if "explanation" not in result or "impact" not in result:
+            return fallback
+
+        return {
+            "explanation": result["explanation"],
+            "impact": result["impact"],
+        }
+    except Exception:
+        return fallback

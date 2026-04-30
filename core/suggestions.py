@@ -1,40 +1,90 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Dict, List
+
+import pandas as pd
 
 
-def generate_suggestions(profile: dict) -> list[str]:
-	suggestions: list[str] = []
+def generate_suggestions(df: pd.DataFrame) -> List[Dict[str, Any]]:
+	if df is None:
+		raise ValueError("df must be provided for suggestion generation")
 
-	dataset = profile.get("dataset", {})
-	n_rows = int(dataset.get("n_rows", 0) or 0)
-	duplicate_rows = int(dataset.get("duplicate_rows", 0) or 0)
+	suggestions: List[Dict[str, Any]] = []
 
+	n_rows = int(len(df))
+	duplicate_rows = int(df.duplicated().sum()) if n_rows else 0
 	if duplicate_rows > 0:
 		suggestions.append(
-			f"Dataset has {duplicate_rows} duplicate rows; consider deduplication."
+			{
+				"id": "duplicate_rows",
+				"type": "duplicate_rows",
+				"column": None,
+				"issue": f"{duplicate_rows} duplicate rows",
+				"action": "remove_duplicates",
+				"params": {"count": duplicate_rows},
+				"confidence": 0.8,
+			}
 		)
 
-	columns: dict[str, Any] = profile.get("columns", {})
-	for name, stats in columns.items():
-		missing_count = int(stats.get("missing_count", 0) or 0)
+	for column in df.columns:
+		series = df[column]
+		missing_count = int(series.isna().sum())
+		missing_pct = (missing_count / n_rows) * 100 if n_rows else 0.0
+
 		if missing_count > 0:
 			suggestions.append(
-				f"Column '{name}' has {missing_count} missing values; consider imputation."
+				{
+					"id": f"missing_{column}",
+					"type": "missing_values",
+					"column": str(column),
+					"issue": f"{missing_pct:.0f}% missing values",
+					"action": "fill_median",
+					"params": {
+						"missing_count": missing_count,
+						"missing_pct": float(missing_pct),
+					},
+					"confidence": 0.85,
+				}
 			)
 
-		unique_count = int(stats.get("unique_count", 0) or 0)
-		if n_rows > 0 and unique_count / n_rows >= 0.95:
+		if missing_pct > 40.0:
 			suggestions.append(
-				f"Column '{name}' has very high cardinality; consider encoding or dropping."
+				{
+					"id": f"high_missing_{column}",
+					"type": "high_missing_pct",
+					"column": str(column),
+					"issue": f"{missing_pct:.0f}% missing values",
+					"action": "drop_column",
+					"params": {"missing_pct": float(missing_pct)},
+					"confidence": 0.7,
+				}
 			)
 
-		numeric = stats.get("numeric")
-		if isinstance(numeric, dict):
-			skew_value = numeric.get("skew")
-			if isinstance(skew_value, (int, float)) and (skew_value > 1 or skew_value < -1):
-				suggestions.append(
-					f"Column '{name}' is highly skewed (skew={skew_value:.2f}); consider transformation."
-				)
+		if pd.api.types.is_numeric_dtype(series):
+			numeric = pd.to_numeric(series, errors="coerce").dropna()
+			if not numeric.empty:
+				q1 = float(numeric.quantile(0.25))
+				q3 = float(numeric.quantile(0.75))
+				iqr = q3 - q1
+				lower = q1 - 1.5 * iqr
+				upper = q3 + 1.5 * iqr
+				outlier_count = int(((numeric < lower) | (numeric > upper)).sum())
+
+				if outlier_count > 0:
+					suggestions.append(
+						{
+							"id": f"outliers_{column}",
+							"type": "numeric_outliers",
+							"column": str(column),
+							"issue": f"{outlier_count} outliers detected (IQR)",
+							"action": "remove_outliers",
+							"params": {
+								"outlier_count": outlier_count,
+								"lower_bound": float(lower),
+								"upper_bound": float(upper),
+							},
+							"confidence": 0.75,
+						}
+					)
 
 	return suggestions
